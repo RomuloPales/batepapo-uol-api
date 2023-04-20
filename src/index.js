@@ -3,13 +3,12 @@ import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
 import { MongoClient } from "mongodb";
-import cors from "cors"
+import cors from "cors";
 dotenv.config();
 
 const app = express();
 
 app.use(express.json());
-app.use(cors)
 
 const participantsScrhema = joi.object({
   name: joi.string().required().min(3),
@@ -126,7 +125,7 @@ app.get("/messages", async (req, res) => {
   }
 });
 
-app.post("/status", async (req, res) => { 
+app.post("/status", async (req, res) => {
   const { user } = req.headers;
 
   try {
@@ -138,12 +137,41 @@ app.post("/status", async (req, res) => {
     }
     await participantsCollection.updateOne(
       { name: user },
-      { $set: { laststatus: Date.now ()} }
-
+      { $set: { laststatus: Date.now() } }
     );
-    res.sendStatus(200)
+    res.sendStatus(200);
   } catch (err) {
     console.log(err);
   }
 });
+
+setInterval(async () => {
+  const dateTenSecondAgo = Date.now() - 10000;
+  try {
+    const participantsInactive = await participantsCollection
+      .find({
+        laststatus: { $lte: dateTenSecondAgo },
+      })
+      .toArray();
+
+    if (participantsInactive.length > 0) {
+      const inactiveMessage = participantsInactive.map((participant) => {
+        return {
+          from: participant.name,
+          to: "todos",
+          text: "sai da sala",
+          type: "status",
+          time: dayjs().format("HH:mm:ss"),
+        };
+      });
+      console.log(inactiveMessage)
+       await messageCollection.insertMany(inactiveMessage);
+      await participantsCollection.deleteMany({
+        laststatus: { $lte: dateTenSecondAgo },
+      });
+    }
+  } catch (err) {
+    console.log(err);
+  }
+}, 15000);
 app.listen(5000, () => console.log("server running in port 5000"));
