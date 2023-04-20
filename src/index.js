@@ -12,6 +12,14 @@ const participantsScrhema = joi.object({
   name: joi.string().required().min(3),
 });
 
+const messagSchema = joi.object({
+  from: joi.string().required(),
+  to: joi.string().required().min(3),
+  text: joi.string().required().min(3),
+  type: joi.string().required().valid("message", "private_message"),
+  time: joi.string(),
+});
+
 const mongoClient = new MongoClient(process.env.MONGO_URI);
 
 try {
@@ -62,6 +70,53 @@ app.get("/participants", async (req, res) => {
       return res.sendStatus(404);
     }
     res.send(participants);
+  } catch (err) {
+    console.log(err);
+  }
+});
+
+app.post("/messages", async (req, res) => {
+  const { to, text, type } = req.body;
+  const { user } = req.headers;
+
+  const message = {
+    from: user,
+    to,
+    text,
+    type,
+    time: dayjs().format("HH:mm:ss"),
+  };
+
+  try {
+    const { error } = messagSchema.validate(message, { abortEarly: false });
+    if (error) {
+      const errors = error.details.map((detail) => detail.message);
+      return res.status(422).send(errors);
+    }
+    await messageCollection.insertOne(message);
+    res.sendStatus(201);
+  } catch (err) {
+    console.log(err);
+  }
+});
+
+app.get("/messages", async (req, res) => {
+  const limit = Number(req.query.limit);
+  const { user } = req.headers;
+  try {
+    const messages = await messageCollection
+      .find({
+        $or: [
+          { from: user },
+          { to: { $in: [user, "todos"] } },
+          { type: "message" },
+        ],
+      }).limit(limit)
+      .toArray();
+    if (!messages) {
+      return res.sendStatus(404);
+    }
+    res.send(messages);
   } catch (err) {
     console.log(err);
   }
