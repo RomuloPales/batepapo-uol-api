@@ -3,10 +3,13 @@ import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
 import { MongoClient } from "mongodb";
+import cors from "cors"
 dotenv.config();
 
 const app = express();
+
 app.use(express.json());
+app.use(cors)
 
 const participantsScrhema = joi.object({
   name: joi.string().required().min(3),
@@ -111,12 +114,34 @@ app.get("/messages", async (req, res) => {
           { to: { $in: [user, "todos"] } },
           { type: "message" },
         ],
-      }).limit(limit)
+      })
+      .limit(limit)
       .toArray();
     if (!messages) {
       return res.sendStatus(404);
     }
     res.send(messages);
+  } catch (err) {
+    console.log(err);
+  }
+});
+
+app.post("/status", async (req, res) => { 
+  const { user } = req.headers;
+
+  try {
+    const participantExist = await participantsCollection.findOne({
+      name: user,
+    });
+    if (!participantExist) {
+      return res.sendStatus(404);
+    }
+    await participantsCollection.updateOne(
+      { name: user },
+      { $set: { laststatus: Date.now ()} }
+
+    );
+    res.sendStatus(200)
   } catch (err) {
     console.log(err);
   }
