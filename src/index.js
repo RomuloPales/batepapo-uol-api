@@ -9,6 +9,7 @@ dotenv.config();
 const app = express();
 
 app.use(express.json());
+app.use(cors())
 
 const participantsScrhema = joi.object({
   name: joi.string().required().min(3),
